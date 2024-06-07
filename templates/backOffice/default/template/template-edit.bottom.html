@@ -14,6 +14,7 @@
                         <th>ID</th>
                         <th>{intl d='option.bo.default' l="Référence"}</th>
                         <th>{intl d='option.bo.default' l="Titre de l'option"}</th>
+                        <th>{intl d='option.bo.default' l="Titre du produit"}</th>
                         <th>{intl d='option.bo.default' l="Prix"}</th>
                         <th class="text-right">{intl d='option.bo.default' l="Actions"}</th>
                     </tr>
@@ -31,8 +32,7 @@
                             <td>{$CURENT_OPTION_ID}</td>
                             <td>{$REF}</td>
                             <td>
-                                <a href="{url
-                                path="/admin/option/update" option_id=$ID}">{$TITLE}</a>
+                                <a href="{url path=/admin/option/update}" option_id=$ID}">{$TITLE}</a>
                             </td>
                             <td>{format_money number=$BEST_TAXED_PRICE}</td>
                             <td class="text-right">

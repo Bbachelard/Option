@@ -1,17 +1,132 @@
+
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.6/js/jquery.dataTables.min.js"></script>
+
 <script>
     $(function () {
-        $('a.option-delete').click(function(ev) {
-            $('#option_delete_id').val($(this).data('id'));
+        var optionsTable = $('#optionsTable');
+        $(document).ready(function() {
+            var products = [];
+
+            function loadProducts() {
+                $.ajax({
+                    url: '/open_api/option/product',
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(response) {
+                        products = response.map(function(product) {
+                            return {
+                                label: product.title + " (" + product.ref + ")",
+                                value: product.title,
+                                id: product.id,
+                                options: product.option_ids || []
+                            };
+                        });
+                        $("#productSearch").autocomplete({
+                            source: products,
+                            select: function(event, ui) {
+                                var selectedProductOptions = ui.item.options;
+                                var optionsTable = $('#optionsTable');
+                                $("#productSearch").val(ui.item.value);
+                                optionsTable.find('thead, tfoot').show();
+                                optionsTable.find('tbody tr').each(function() {
+                                    var optionId = $(this).data('option-id');
+                                    var optionFound = selectedProductOptions.includes(optionId);
+
+                                    if (optionFound) {
+                                        $(this).show();
+                                    } else {
+                                        $(this).hide();
+                                    }
+                                });
+
+                                return false;
+                            }
+                        });
+                        $("#productSearch").on('input', function() {
+                            var filter = $(this).val().toUpperCase();
+                            if (!filter) {
+                                $('#optionsTable tbody tr').show();
+                            }
+                        });
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error('Error:', errorThrown);
+                    }
+                });
+            }
+            loadProducts();
+        });
+
+        $('#minPrice, #maxPrice').on('keyup', function () {
+            var minPrice = parseInt($('#minPrice').val().replace(/\s/g, ''));
+            var maxPrice = parseInt($('#maxPrice').val().replace(/\s/g, ''));
+            optionsTable.find('tr').each(function () {
+                var price = parseInt($(this).find('td:nth-child(5)').text().replace(/\s/g, ''));
+                if (!isNaN(price)) {
+                    if ((isNaN(minPrice) || price >= minPrice) && (isNaN(maxPrice) || price <= maxPrice)) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                }
+            });
+            optionsTable.find('thead, tfoot').show();
+        });
+
+        function fixTableHeader() {
+            var scrollTop = $(window).scrollTop();
+            var tableOffset = optionsTable.offset().top;
+            if (scrollTop > tableOffset) {
+                $('.search-bar').addClass('sticky');
+            } else {
+                $('.search-bar').removeClass('sticky');
+            }
+        }
+        fixTableHeader();
+        $(window).scroll(function() {
+            fixTableHeader();
+        });
+        $('#searchInput').on('keyup', function() {
+            var filter = $(this).val().toUpperCase();
+            var hasVisibleRow = false;
+            optionsTable.find('tbody tr').each(function() {
+                var found = false;
+                $(this).find('td').each(function() {
+                    var txtValue = $(this).text().toUpperCase();
+                    if (txtValue.indexOf(filter) > -1) {
+                        found = true;
+                        return false;
+                    }
+                });
+                if (found) {
+                    $(this).show();
+                    hasVisibleRow = true;
+                } else {
+                    $(this).hide();
+                }
+            });
+            if (hasVisibleRow) {
+                optionsTable.find('thead, tfoot').show();
+            } else {
+                optionsTable.find('thead, tfoot').hide();
+            }
+        });
+        fixSearchBar();
+        $(window).scroll(function () {
+            fixSearchBar();
         });
 
         function update_price(price, price_type, dest_field_id) {
             var tax_rule_id = $('#tax_rule_field').val();
-            if (tax_rule_id != "") {
+            if (tax_rule_id !== "") {
                 var operation;
 
-                if (price_type.indexOf('with-tax') != -1)
+                if (price_type.indexOf('with-tax') !== -1)
                     operation = 'from_tax';
-                else if (price_type.indexOf('without-tax') != -1)
+                else if (price_type.indexOf('without-tax') !== -1)
                     operation = 'to_tax';
                 else
                     operation = '';
@@ -37,12 +152,158 @@
 
         function sanitizeFloat(numVal) {
             return numVal.replace(",", ".");
-        };
+        }
 
         $('.automatic_price_field').on('keyup', function () {
             var price = $(this).val();
             $(this).val(sanitizeFloat(price));
             update_price($(this).val(), $(this).data('price-type'), $(this).data('rel-price'));
+            optionsTable.find('thead, tfoot').show();
         });
+
+
     });
+
+
+
+    $(document).ready(function () {
+        var optionsTable = $('#optionsTable');
+        var generalBlockDecorator = $('.form-group');
+        function applyFilters() {
+            var minPrice = parseInt($('#minPrice').val().replace(/\s/g, '')) || 0;
+            var maxPrice = parseInt($('#maxPrice').val().replace(/\s/g, '')) || Infinity;
+            var onlineOnly = $('#onlineCheckbox').is(':checked');
+
+            $('.filterable-element').removeClass('filter-active');
+
+            // Appliquer la couleur de fond pour le filtre de prix minimum si activé
+            if (minPrice > 0) {
+                $('#minPrice').closest('.filterable-element').addClass('filter-active');
+            }
+            if (maxPrice < Infinity) {
+                $('#maxPrice').closest('.filterable-element').addClass('filter-active');
+            }
+            if (onlineOnly) {
+                $('#onlineCheckbox').closest('.filterable-element').addClass('filter-active');
+            }
+            optionsTable.find('tbody tr').each(function () {
+                var price = parseInt($(this).find('td:nth-child(5)').text().replace(/\s/g, '')) || 0;
+                var online = $(this).find('.productVisibleToggle input').is(':checked');
+
+                if ((price >= minPrice) && (price <= maxPrice) && (!onlineOnly || online)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        }
+
+        $('#minPrice, #maxPrice, #onlineCheckbox').on('input change', function () {
+            applyFilters();
+        });
+        optionsTable.find('thead, tfoot').show();
+    });
+
+    $(document).ready(function() {
+        function loadCategories() {
+            $.ajax({
+                url: '',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    response.forEach(function(category) {
+                        $('#categorySelect').append('<option value="' + category.id + '">' + category.name + '</option>');
+                    });
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('Erreur lors du chargement des catégories:', errorThrown);
+                }
+            });
+        }
+        loadCategories();
+    });
+
+
+
+
+
+    //compliqur :
+
+
+    var table = $module.find('.js-list').DataTable( {
+        processing: true,
+        serverSide: true,
+        searching: false,
+        lengthChange: false,
+        order: [[ 1, "desc" ]],
+        drawCallback:function (oSettings) {
+            //console.log(oSettings);
+        },
+        ajax: {
+            ajax: "{url current=true}",
+            method: 'POST',
+            data: function (data) {
+                resetPopoverPosition();
+            }
+        },
+        displayLength: 25,
+        columnDefs: [
+            {
+                targets: 0,
+                orderable: false,
+                className: "text-center",
+                render: function (data, type, row, meta) {
+                    return '<input type="checkbox" class="select_customer" data-id="' + row[0]["product_ids"] + '">';
+                },
+            },
+            {
+                targets: [1, 2],
+                responsivePriority: 4
+            },
+            {
+                className: "text-center",
+                targets: 2,
+                render: function ( data, type, row, meta ) {
+                    var href = row[10] + '&current_tab=images';
+
+                    if (data !== '') {
+                        return '<a href="' + href + '"><img src="' + data + '" style="width: 50px; height: 50px;" /></a>'
+                    }
+
+                    return '<a href="' + href + '" style="line-height:50px;text-align:center;width: 50px; height: 50px;">Aucune</a>';
+                }
+            },
+            {
+                targets: [1, 3, 4],
+                render: function ( data, type, row, meta ) {
+                    return '<a href="' + row[10] + '">' + data + '</a>'
+                }
+            },
+            {
+                className: "text-center",
+                targets: 5,
+                render: function ( data, type, row, meta ) {
+                    return '<a href="#" class="js-edit-price">' + data[0] + ' HT</a>'
+                        + '<br/>'
+                        + '<a href="#" class="js-edit-price">' + data[1] + ' TTC</a>';
+                },
+                responsivePriority: 3
+            },
+            {
+                className: "text-right",
+                targets: 10,
+                render: function ( data, type, row, meta ) {
+                    return '<a href="' + data + '" class="btn btn-primary" title="Voir">' +
+                        '<i class="glyphicon glyphicon-eye-open"></i>' +
+                        '</a>' +
+                        ' <a href="' + data + '" class="btn btn-danger js-action-delete" title="Supprimer" data-id="' + row[0] + '">' +
+                        '<i class="glyphicon glyphicon-trash"></i>' +
+                        '</a>';
+                }
+            }
+        ],
+    });
+
+
+
 </script>

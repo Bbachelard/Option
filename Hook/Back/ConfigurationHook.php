@@ -5,6 +5,7 @@ namespace Option\Hook\Back;
 use Exception;
 use Option\Service\OptionService;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Hook\BaseHook;
 use Thelia\Core\Template\Assets\AssetResolverInterface;
@@ -52,13 +53,15 @@ class ConfigurationHook extends BaseHook
     public function onModuleConfiguration(HookRenderEvent $event): void
     {
         $optionCategory = $this->optionService->getOptionCategory();
-
+        $this->optionService->listAction();
         $event->add(
             $this->render('option-configuration.html', [
-                'category_id' => $optionCategory->getId()
+                'category_id' => $optionCategory->getId(),
+                'columnsDefinition' => $this->optionService->defineColumnsDefinition(),
             ])
         );
     }
+
 
     public function onModuleConfigurationJs(HookRenderEvent $event): void
     {

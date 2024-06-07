@@ -5,19 +5,27 @@ namespace Option\Service;
 use Exception;
 use LogicException;
 use Option\Event\CheckOptionEvent;
+use Option\Model\OptionProductQuery;
 use Option\Model\ProductAvailableOptionQuery;
 use Option\Option as OptionModule;
+use Propel\Runtime\ActiveQuery\Criteria;
 use Propel\Runtime\Exception\PropelException;
 use Symfony\Component\Form\Form;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Core\Event\Product\ProductDeleteEvent;
 use Thelia\Core\Event\TheliaEvents;
+use Thelia\Core\HttpFoundation\JsonResponse;
+use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\Translation\Translator;
 use Thelia\Model\Category;
 use Thelia\Model\CategoryQuery;
+use Thelia\Model\Map\ProductTableMap;
 use Thelia\Model\Product;
 use Thelia\Model\ProductPrice;
+use Thelia\Model\ProductQuery;
 use Thelia\TaxEngine\TaxEngine;
+use Thelia\Tools\URL;
 
 /**
  *
@@ -32,9 +40,11 @@ class OptionService
     public function __construct(
         protected EventDispatcherInterface $dispatcher,
         protected OptionProvider           $optionProvider,
-        protected TaxEngine $taxEngine
+        protected TaxEngine                $taxEngine,
+        protected RequestStack             $requestStack,
     )
-    {}
+    {
+    }
 
     public function createOption(Form $form): void
     {
@@ -76,10 +86,10 @@ class OptionService
 
         $optionCategory = CategoryQuery::create()
             ->useCategoryI18nQuery()
-                ->filterByTitle(OptionModule::OPTION_CATEGORY_TITLE)
-                ->filterByLocale($locale)
+            ->filterByTitle(OptionModule::OPTION_CATEGORY_TITLE)
+            ->filterByLocale($locale)
             ->endUse()
-        ->findOne();
+            ->findOne();
 
         return $optionCategory ?? $this->createOptionCategory(OptionModule::OPTION_CATEGORY_TITLE);
     }
@@ -169,4 +179,156 @@ class OptionService
     {
         return $this->getOptionPrice($option, $isPromo, false);
     }
+
+
+    /**
+     * @param bool $withPrivateData
+     * @return array
+     */
+    public function defineColumnsDefinition($withPrivateData = false)
+    {
+        $i = -1;
+        $definitions = [
+            [
+                'name' => 'id',
+                'targets' => ++$i,
+                'orm' => ProductTableMap::ID,
+                'title' => 'Id',
+                'orderable' => true,
+                'searchable' => false
+            ],
+            [
+                'name' => 'images',
+                'targets' => ++$i,
+                'title' => 'Image',
+                'orderable' => false,
+                'searchable' => false
+            ],
+            [
+                'name' => 'ref',
+                'targets' => ++$i,
+                'orm' => ProductTableMap::REF,
+                'title' => 'Référence',
+                'orderable' => true,
+                'searchable' => true
+            ],
+            [
+                'name' => 'title',
+                'targets' => ++$i,
+                'orm' => 'product_i18n_TITLE',
+                'title' => 'Titre',
+                'orderable' => true,
+                'searchable' => true
+            ],
+            [
+                'name' => 'price',
+                'targets' => ++$i,
+                'orm' => 'price',
+                'title' => 'Prix',
+                'orderable' => true,
+                'searchable' => false
+            ],
+            [
+                'name' => 'Online',
+                'targets' => ++$i,
+                'title' => 'Online',
+                'orderable' => true,
+                'searchable' => false
+            ],
+            [
+                'name' => 'action',
+                'targets' => ++$i,
+                'title' => 'Action',
+                'orderable' => true,
+                'searchable' => false
+            ]
+        ];
+
+        if (!$withPrivateData) {
+            foreach ($definitions as &$definition) {
+                unset($definition['orm']);
+            }
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * @param Request $request
+     * @return string
+     */
+    protected function getOrderColumnName(Request $request)
+    {
+
+        $columnDefinition = $this->defineColumnsDefinition(true)[(int)$request->get('order')[0]['column']];
+
+        return $columnDefinition['orm'];
+    }
+
+    protected function getOrderDir(Request $request)
+    {
+        return (string)$request->get('order')[0]['dir'] === 'asc' ? Criteria::ASC : Criteria::DESC;
+    }
+
+    protected function applyOrder(Request $request, OptionProductQuery $query)
+    {
+        $query->orderBy(
+            $this->getOrderColumnName($request),
+            $this->getOrderDir($request)
+        );
+    }
+
+    public function listAction()
+    {
+        $request = $this->requestStack->getCurrentRequest();
+
+        $query = OptionProductQuery::create();
+        $query->useProductQuery()
+            ->endUse()
+            ->find();
+        $query->useProductQuery()->endUse();
+        //$this->applyOrder($request, $query);
+
+        $query->offset($this->getOffset($request));
+        $campaigns = $query->limit($this->getLength($request))->find();
+        $json = [
+            "data" => [],
+            "campaigns" => count($campaigns->getData()),
+        ];
+        foreach ($campaigns as $campaign) {
+            $json['data'][] = [
+                [
+                    'product_ids' => $campaign->getProductId(),
+                    'href' => URL::getInstance()->absoluteUrl('/admin/module/option/' . $campaign->getId())
+                ],
+                $campaign->getProduct()->getTitle(),
+                $campaign->getProduct()->getRef(),
+                [
+                    "url" => URL::getInstance()->absoluteUrl('admin/module/option/campaign/' . $campaign->getId())
+                ]
+            ];
+        }
+
+        //dd($json);
+        return new JsonResponse(array('optionFilter' => $json));
+    }
+
+
+    /**
+     * @param Request $request
+     * @return int
+     */
+    protected function getLength(Request $request)
+    {
+        return (int) $request->get('length');
+    }
+    /**
+     * @param Request $request
+     * @return int
+     */
+    protected function getOffset(Request $request)
+    {
+        return (int) $request->get('start');
+    }
+
 }

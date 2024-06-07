@@ -6,7 +6,6 @@ use Exception;
 use OpenApi\Service\OpenApiService;
 use OpenApi\Controller\Front\BaseFrontOpenApiController;
 use OpenApi\Model\Api\ModelFactory;
-use OpenApi\OpenApi;
 use Option\Model\OptionProduct;
 use Option\Service\CartItemCustomizationOptionHandler;
 use Option\Service\OptionService;
@@ -16,11 +15,15 @@ use Thelia\Core\Translation\Translator;
 use Thelia\Model\CartItemQuery;
 use Symfony\Component\Routing\Annotation\Route;
 use Thelia\Model\ProductQuery;
+use Option\Model\OptionProductQuery;
+
+use Option\Model\ProductAvailableOptionQuery;
 use OpenApi\Annotations as OA;
 
 #[Route(path: '/open_api/option', name: 'option')]
 class OptionController extends BaseFrontOpenApiController
 {
+
     /**
      * @OA\GET(
      *     path="/option/get/{pseId}",
@@ -66,6 +69,7 @@ class OptionController extends BaseFrontOpenApiController
             ->endUse()
             ->findOne();
 
+
         if (!$product) {
             return new JsonResponse([]);
         }
@@ -76,21 +80,32 @@ class OptionController extends BaseFrontOpenApiController
 
         $options = $optionService->getProductAvailableOptions($product);
 
+
         /** @var OptionProduct $option */
         foreach ($options as $option) {
+            $productName = $this->getProductNameForOption($option);
             $optionsData[] = $modelFactory->buildModel(
                 'Option',
                 [
                     'title' => $option->getProduct()->setLocale($locale)->getTitle(),
                     'id' => $option->getId(),
                     'code' => $option->getProduct()?->getRef(),
+                    'productName' => $productName,
                     'price' => round($optionService->getOptionTaxedPrice($option->getProduct()), 2),
                     'untaxedPrice' => round($optionService->getOptionUnTaxedPrice($option->getProduct()), 2)
                 ]
             );
         }
 
+
         return OpenApiService::jsonResponse($optionsData);
+
+
+    }
+    private function getProductNameForOption(OptionProduct $option): ?string
+    {
+        $product = $option->getProduct();
+        return $product ? $product->setLocale($this->getLocale())->getTitle() : null;
     }
 
     /**
@@ -173,4 +188,88 @@ class OptionController extends BaseFrontOpenApiController
             'cart' => $openApiService->getCurrentOpenApiCart()
         ]);
     }
+
+
+    /**
+     * @OA\GET(
+     *     path="/option/product",
+     *     tags={"Option"},
+     *     summary="List available products with options",
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             type="array",
+     *             @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="id",
+     *                     type="integer"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="ref",
+     *                     type="string"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="option_ids",
+     *                     type="array",
+     *                     @OA\Items(type="integer")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Bad request",
+     *         @OA\JsonContent(ref="#/components/schemas/Error")
+     *     )
+     * )
+     */
+    #[Route(path: '/product', name: '_get_product', methods: 'GET')]
+    public function getProduct(): JsonResponse
+    {
+        $products = ProductQuery::create()
+            ->innerJoinWith('Product.ProductAvailableOption')
+            ->find();
+        $optionProducts = OptionProductQuery::create()
+            ->select(['id', 'product_id'])
+            ->find();
+
+
+        $optionProductMap = [];
+        foreach ($optionProducts as $optionProduct) {
+            $optionProductId = isset($optionProduct['id']) ? $optionProduct['id'] : null;
+            $optionProductProductId = isset($optionProduct['product_id']) ? $optionProduct['product_id'] :null;
+            if ($optionProductId !== null) {
+                $optionProductMap[$optionProductId] = $optionProductProductId;
+            }
+        }
+
+        $formattedData = [];
+        $processedProducts = [];
+        foreach ($products as $product) {
+            $productId = $product->getId();
+            if (!isset($processedProducts[$productId])) {
+                $optionIds = [];
+                $productAvailableOptions = $product->getProductAvailableOptions();
+                foreach ($productAvailableOptions as $productAvailableOption) {
+                    $optionId = $productAvailableOption->getOptionId();
+                    $optionIds[] = $optionProductMap[$optionId];
+                }
+                $formattedData[] = [
+                    'id' => $productId,
+                    'title' => $product->getTitle(),
+                    'ref'=> $product->getRef(),
+                    'option_ids' => $optionIds
+                ];
+                $processedProducts[$productId] = true;
+            }
+        }
+
+
+        return OpenApiService::jsonResponse($formattedData);
+    }
+
+
+
 }
