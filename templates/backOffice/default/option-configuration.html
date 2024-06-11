@@ -1,3 +1,4 @@
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 {$domain = "option.fo.default"}
 {$page={$page|default:{$smarty.get.page|default:1}}}
@@ -11,12 +12,6 @@
                     <label for="searchInput">Recherche une option :</label>
                     <input type="text" id="searchInput" class="form-control" placeholder="Rechercher...">
                 </div>
-            </div>
-            <div class="col-md-3 form-group">
-                <label for="categorySelect">Sélectionner une catégorie :</label>
-                <select id="categorySelect" class="form-control">
-                    <option value="">Aucune Catégorie</option>
-                </select>
             </div>
             <div class="col-md-4 filterable-element">
                 <div class="form-group">
@@ -36,13 +31,17 @@
                     <input type="number" id="maxPrice" class="form-control" placeholder="Prix maximum">
                 </div>
             </div>
-            <div class="col-md-3 filterable-element ">
-                <div class="form-group checkbox-group">
-                    <label for="onlineCheckbox" class="checkbox-label">En ligne uniquement :</label>
-                    <input type="checkbox" id="onlineCheckbox" class="styled-checkbox">
-                    <label for="onlineCheckbox" class="styled-checkbox-label"></label>
+            <div class="col-md-3 filterable-element">
+                <div class="form-group">
+                    <label for="onlineSelect" class="checkbox-label">Statut en ligne :</label>
+                    <select id="onlineSelect" class="styled-select">
+                        <option value="all">Tous</option>
+                        <option value="online">En ligne</option>
+                        <option value="offline">Hors ligne</option>
+                    </select>
                 </div>
             </div>
+
         </div>
     </div>
     <div class="table-responsive">
@@ -65,9 +64,16 @@
             <thead>
             <tr>
                 {foreach from=$columnsDefinition item=definition}
-                <td>
+                <th>
                     {$definition.title nofilter}
-                </td>
+                    {if $definition.orderable == true}
+                    <span class="sort-arrows">
+                        <i class="sort-up" data-sort="asc">&#9650;</i>
+                        <i class="sort-down" data-sort="desc">&#9660;</i>
+                    </span>
+
+                    {/if}
+                </th>
                 {/foreach}
             </tr>
             </thead>
@@ -155,6 +161,9 @@
 </div>
 {form name="thelia.admin.product.creation"}
 {/form}
+
+
+
 
 <style>
     .sticky {
@@ -320,7 +329,6 @@
         border-width: 0 2px 2px 0;
         transform: rotate(45deg);
     }
-
     .styled-checkbox:checked + .styled-checkbox-label::after {
         display: block;
     }
@@ -329,13 +337,11 @@
         background-color: #007bff;
         border-color: #007bff;
     }
-
     .checkbox-label {
         margin-right: 10px;
         font-weight: bold;
     }
     .filter-active {
-        background-color: #e6f7ff; /* Couleur bleu pastel */
+        background-color: #e6f7ff;
     }
-
 </style>

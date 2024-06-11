@@ -53,7 +53,6 @@ class ConfigurationHook extends BaseHook
     public function onModuleConfiguration(HookRenderEvent $event): void
     {
         $optionCategory = $this->optionService->getOptionCategory();
-        $this->optionService->listAction();
         $event->add(
             $this->render('option-configuration.html', [
                 'category_id' => $optionCategory->getId(),

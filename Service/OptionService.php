@@ -9,7 +9,6 @@ use Option\Model\OptionProductQuery;
 use Option\Model\ProductAvailableOptionQuery;
 use Option\Option as OptionModule;
 use Propel\Runtime\ActiveQuery\Criteria;
-use Propel\Runtime\Exception\PropelException;
 use Symfony\Component\Form\Form;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
@@ -257,78 +256,5 @@ class OptionService
      * @param Request $request
      * @return string
      */
-    protected function getOrderColumnName(Request $request)
-    {
-
-        $columnDefinition = $this->defineColumnsDefinition(true)[(int)$request->get('order')[0]['column']];
-
-        return $columnDefinition['orm'];
-    }
-
-    protected function getOrderDir(Request $request)
-    {
-        return (string)$request->get('order')[0]['dir'] === 'asc' ? Criteria::ASC : Criteria::DESC;
-    }
-
-    protected function applyOrder(Request $request, OptionProductQuery $query)
-    {
-        $query->orderBy(
-            $this->getOrderColumnName($request),
-            $this->getOrderDir($request)
-        );
-    }
-
-    public function listAction()
-    {
-        $request = $this->requestStack->getCurrentRequest();
-
-        $query = OptionProductQuery::create();
-        $query->useProductQuery()
-            ->endUse()
-            ->find();
-        $query->useProductQuery()->endUse();
-        //$this->applyOrder($request, $query);
-
-        $query->offset($this->getOffset($request));
-        $campaigns = $query->limit($this->getLength($request))->find();
-        $json = [
-            "data" => [],
-            "campaigns" => count($campaigns->getData()),
-        ];
-        foreach ($campaigns as $campaign) {
-            $json['data'][] = [
-                [
-                    'product_ids' => $campaign->getProductId(),
-                    'href' => URL::getInstance()->absoluteUrl('/admin/module/option/' . $campaign->getId())
-                ],
-                $campaign->getProduct()->getTitle(),
-                $campaign->getProduct()->getRef(),
-                [
-                    "url" => URL::getInstance()->absoluteUrl('admin/module/option/campaign/' . $campaign->getId())
-                ]
-            ];
-        }
-
-        //dd($json);
-        return new JsonResponse(array('optionFilter' => $json));
-    }
-
-
-    /**
-     * @param Request $request
-     * @return int
-     */
-    protected function getLength(Request $request)
-    {
-        return (int) $request->get('length');
-    }
-    /**
-     * @param Request $request
-     * @return int
-     */
-    protected function getOffset(Request $request)
-    {
-        return (int) $request->get('start');
-    }
 
 }

@@ -225,26 +225,25 @@ class OptionController extends BaseFrontOpenApiController
      *     )
      * )
      */
+
     #[Route(path: '/product', name: '_get_product', methods: 'GET')]
     public function getProduct(): JsonResponse
     {
         $products = ProductQuery::create()
-            ->innerJoinWith('Product.ProductAvailableOption')
+            ->useProductAvailableOptionQuery()
+            ->endUse()
             ->find();
         $optionProducts = OptionProductQuery::create()
             ->select(['id', 'product_id'])
             ->find();
-
-
         $optionProductMap = [];
         foreach ($optionProducts as $optionProduct) {
-            $optionProductId = isset($optionProduct['id']) ? $optionProduct['id'] : null;
-            $optionProductProductId = isset($optionProduct['product_id']) ? $optionProduct['product_id'] :null;
+            $optionProductId = $optionProduct['id'] ?? null;
+            $optionProductProductId = $optionProduct['product_id'] ?? null;
             if ($optionProductId !== null) {
                 $optionProductMap[$optionProductId] = $optionProductProductId;
             }
         }
-
         $formattedData = [];
         $processedProducts = [];
         foreach ($products as $product) {
@@ -265,8 +264,6 @@ class OptionController extends BaseFrontOpenApiController
                 $processedProducts[$productId] = true;
             }
         }
-
-
         return OpenApiService::jsonResponse($formattedData);
     }
 
