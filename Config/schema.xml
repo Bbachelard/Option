@@ -16,6 +16,9 @@
         <column autoIncrement="true" name="id" primaryKey="true" required="true" type="INTEGER" />
         <column name="product_id" required="true" type="INTEGER" />
         <column name="option_id" required="true" type="INTEGER" />
+        <column defaultValue="0.000000" name="price" scale="6" size="16" type="DECIMAL" />
+        <column defaultValue="0.000000" name="promo_price" scale="6" size="16" type="DECIMAL" />
+        <column defaultValue="0" name="is_promo" type="BOOLEAN" />
         <column name="option_added_by" type="JSON" />
 
         <foreign-key foreignTable="product" name="fk_product_available_option_product_id" onDelete="CASCADE" onUpdate="RESTRICT">
