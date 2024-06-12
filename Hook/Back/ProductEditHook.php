@@ -32,5 +32,6 @@ class ProductEditHook extends BaseHook
                 'content' => "Contenu !"
             ]
         );
+
     }
 }

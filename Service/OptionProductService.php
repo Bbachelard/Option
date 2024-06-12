@@ -13,6 +13,7 @@ use Thelia\Model\CategoryQuery;
 use Thelia\Model\ProductQuery;
 use Thelia\Model\Template;
 
+
 class OptionProductService
 {
     public const ADDED_BY_PRODUCT = 1;
@@ -191,4 +192,5 @@ class OptionProductService
 
         $products = array_merge($category->getProducts()->getData(), $products);
     }
+
 }

@@ -7,29 +7,160 @@
     {include file = "product/include/add_option_product_form.html"}
 </div>
 <div class="image-manager form-container">
-{ifloop rel="option_list"}
-{loop name="option_list" table_name="product_available_option" type="generic" filters="product_id:{$product_id}"}
+    {ifloop rel="option_list"}
+    {loop name="option_list" table_name="product_available_option" type="generic" filters="product_id:{$product_id}"}
     {$CURENT_OPTION_ID = $OPTION_ID}
     {loop name="option" table_name="option_product" type="generic" filters="id:{$OPTION_ID}"}
-        {$OPTION_PRODUCT_ID = $PRODUCT_ID}
+    {$OPTION_PRODUCT_ID = $PRODUCT_ID}
     {/loop}
     {loop name="option_product_list" type="product" visible="*" only_option=1 id=$OPTION_PRODUCT_ID|default:null backend_context="1" }
-        <div class="dropzone">
-            <div class="row" style="display: flex; align-items: center">
-                <div class="col-md-8">
-                    <h3>{$TITLE} - {$REF}</h3>
-                    <h3 style="color: #FF9805">{format_money number=$BEST_TAXED_PRICE}</h3>
-                </div>
-                <div class="col-md-4">
-                    <a class="btn btn-danger pull-right modal-open" id="delete" role="button"
-                       data-toggle="modal" data-target="#deleteOptionModal" title="Supprimer l'option">
-                        <span class="glyphicon glyphicon glyphicon-remove-circle"></span></a>
-                    {include file="product/include/modale-delete-product-option.html"}
-                    <a class="btn btn-default pull-right" href="{url path="/admin/option/update" option_id=$OPTION_PRODUCT_ID}"><span class="glyphicon glyphicon glyphicon glyphicon-eye-open"></a>
-                </div>
+    <div class="dropzone">
+        <div class="row" style="display: flex; align-items: center">
+            <div class="col-md-8" id="optionPrice" data-price="{ $option.price}">
+                <h3>{$TITLE} - {$REF}</h3>
+                {foreach $options as $option}
+                    {if $option.option_id eq $CURENT_OPTION_ID}
+                        {if empty($option.price)}
+                            <h3 id='PriceOption' style="color: #FF9805">{format_money number=$BEST_TAXED_PRICE}</h3>
+                        {else}
+                            {if $option.isPromo}
+                                <h3 id="PriceOptionAfterPromo" style="color: #FF9805; text-decoration: line-through; display: inline-block; margin-right: 10px;">
+                                    {$option.price|escape}
+                                </h3>
+                                <h3 id="PromoPrice"  style="color: #FF9805; display: inline-block;">
+                                    {$option.promo|escape}
+                                </h3>
+                            {else}
+                                <h3 id='PriceOptionAfter'style="color: #FF9805">{$option.price|escape}</h3>
+                            {/if}
+                        {/if}
+                    <br>
+                    <a  data-toggle="modal" data-target="#EditPrice" data-product-id="{$product_id}" data-option-id="{$CURENT_OPTION_ID}">modifier</a>
+                {/if}
+                {/foreach}
+              </div>
+            <div class="col-md-4">
+                <a class="btn btn-danger pull-right modal-open" id="delete" role="button"
+                   data-toggle="modal" data-target="#deleteOptionModal" title="Supprimer l'option">
+                    <span class="glyphicon glyphicon glyphicon-remove-circle"></span></a>
+                {include file="product/include/modale-delete-product-option.html"}
+                <a class="btn btn-default pull-right" href="{url path="/admin/option/update" option_id=$OPTION_PRODUCT_ID}"><span class="glyphicon glyphicon glyphicon glyphicon-eye-open"></a>
             </div>
         </div>
+    </div>
     {/loop}
-{/loop}
-{/ifloop}
+    {/loop}
+    {/ifloop}
 </div>
+
+<div class="modal fade" id="EditPrice" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Add/Edit Price</h4>
+            </div>
+            <div class="modal-body">
+                <div id="message-container">
+                    <div id="success-message" class="alert alert-success" style="display: none;"></div>
+                    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                </div>
+                <form id="editPriceForm">
+                    <label for="Price">New Price :</label>
+                    <input type="number" id="Price" name="Price" min="0" step="1"><br><br>
+                    <label for="Promo">Promo Price :</label>
+                    <input type="number" id="Promo" name="Promo" min="0" step="1"><br><br>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default btn-responsive" id="restorePriceBtn">Restore Price</button>
+                        <button type="submit" class="btn btn-primary btn-responsive" id="applyChangesBtn">Apply Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    $(document).ready(function() {
+        $('#EditPrice').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget);
+            var productId = button.data('product-id');
+            var optionId = button.data('option-id');
+            $('#editPriceForm').data('product-id', productId);
+            $('#editPriceForm').data('option-id', optionId);
+            priceText = $('#PriceOption').text();
+            var price = parseFloat(priceText.replace(/[^\d.-]/g, ''));
+            $('#Price').val(price);
+
+        });
+
+        document.getElementById('applyChangesBtn').addEventListener('click', function(event) {
+            event.preventDefault();
+            applyChanges();
+        });
+        $('#restorePriceBtn').click(function() {
+            const productId = $('#editPriceForm').data('product-id');
+            const optionId = $('#editPriceForm').data('option-id');
+            fetch('/admin/option/product/updatePriceAction', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    productId: productId,
+                    optionId: optionId,
+                    price: null,
+                    promoPrice: null
+                })
+            })
+            location.reload();
+        });
+
+        function applyChanges() {
+            const price = document.getElementById('Price').value;
+            const promoPrice = document.getElementById('Promo').value;
+            const productId = $('#editPriceForm').data('product-id');
+            const optionId = $('#editPriceForm').data('option-id');
+            fetch('/admin/option/product/updatePriceAction', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    productId: productId,
+                    optionId: optionId,
+                    price: price,
+                    promoPrice: promoPrice
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const successMessage = document.getElementById('success-message');
+                    const errorMessage = document.getElementById('error-message');
+
+                    if (data.success) {
+                        successMessage.textContent = 'Prices updated successfully.';
+                        successMessage.style.display = 'block';
+                        errorMessage.style.display = 'none';
+                        location.reload();
+                    } else {
+                        errorMessage.textContent = data.message || 'An error occurred.';
+                        errorMessage.style.display = 'block';
+                        successMessage.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    const errorMessage = document.getElementById('error-message');
+                    errorMessage.textContent = 'An error occurred: ' + error.message;
+                    errorMessage.style.display = 'block';
+                    document.getElementById('success-message').style.display = 'none';
+                });
+        }
+    });
+
+
+
+</script>
